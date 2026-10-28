@@ -5,10 +5,7 @@
 # with an expiry date and optional paths, in deps-accept.yaml. Trivy is the release binary, pinned by version and
 # SHA-256 below; its vulnerability database and checks bundle are cached between runs. Linux x64 runners only.
 name: Aedis SCA
-description: >-
-  Trivy filesystem scan of the repository (dependency vulnerabilities, secrets and misconfigurations) with one JSON
-  summary, a Markdown report, SARIF in code scanning and a gate: findings at the configured severity fail the job
-  unless accepted, with an expiry date and optional paths, in deps-accept.yaml.
+description: Trivy filesystem scan (dependencies, secrets, misconfigurations) with a JSON summary, SARIF in code scanning and a gate.
 author: Aedis
 branding:
   icon: package
