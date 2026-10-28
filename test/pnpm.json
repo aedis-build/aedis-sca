@@ -1,0 +1,18 @@
+{
+  "actions": [],
+  "advisories": {
+    "1101234": {
+      "findings": [{"version": "16.0.0", "paths": [".>next"]}],
+      "module_name": "next",
+      "severity": "moderate",
+      "github_advisory_id": "GHSA-next-0001",
+      "cves": [],
+      "title": "Next.js: cache poisoning",
+      "url": "https://github.com/advisories/GHSA-next-0001",
+      "patched_versions": ">=16.0.1",
+      "id": 1101234
+    }
+  },
+  "muted": [],
+  "metadata": {"vulnerabilities": {"info": 0, "low": 0, "moderate": 1, "high": 0, "critical": 0}}
+}

@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "parameters": "--vulnerable --include-transitive",
+  "sources": ["https://api.nuget.org/v3/index.json"],
+  "projects": [
+    {
+      "path": "src/Api/Api.csproj",
+      "frameworks": [
+        {
+          "framework": "net10.0",
+          "topLevelPackages": [
+            {
+              "id": "Foo.Client",
+              "requestedVersion": "1.0.0",
+              "resolvedVersion": "1.0.0",
+              "vulnerabilities": [{"severity": "High", "advisoryurl": "https://github.com/advisories/GHSA-xxxx-yyyy-zzzz"}]
+            }
+          ],
+          "transitivePackages": [
+            {
+              "id": "Bar.Core",
+              "resolvedVersion": "2.0.0",
+              "vulnerabilities": [{"severity": "Low", "advisoryurl": "https://github.com/advisories/GHSA-aaaa-bbbb-cccc"}]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
