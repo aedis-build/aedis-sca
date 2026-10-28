@@ -1,0 +1,19 @@
+# Fixture for test/run.sh: an expired acceptance (blocks again, listed in warnings), a path-scoped one that does not
+# cover the finding, a path-scoped one that does, the v1 `package` alias and a dateless one (ignored).
+accept:
+  - id: CVE-2024-4068
+    until: 2020-01-01            # expired on purpose: the vulnerability must block again
+    reason: braces is only reached by the build tooling; ticket SEC-123
+  - id: AVD-DS-0002
+    until: 2999-12-31
+    reason: the example images run as root on purpose
+    paths: [examples/]           # the finding is in ./Dockerfile, so it still blocks
+  - id: aws-access-key-id
+    until: 2999-12-31
+    reason: sample value in the documented config template
+    paths: [config/]
+  - package: foo.client          # v1 alias: every advisory of this package, whatever its id
+    until: 2999-12-31
+    reason: the vulnerable endpoint is not called
+  - id: GHSA-next-0001
+    reason: no until, so this acceptance is ignored

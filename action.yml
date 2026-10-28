@@ -1,0 +1,128 @@
+# Software composition analysis of the checked-out repository with Trivy (filesystem scan): known vulnerabilities of
+# the dependencies in the lock files, secrets in the files and misconfigurations in Dockerfiles, Kubernetes manifests,
+# Helm charts and IaC, with one JSON summary (aedis.platform/deps-summary/v2), a Markdown report in the job summary,
+# the SARIF in code scanning and a gate: findings at or above the configured severity fail the job unless accepted,
+# with an expiry date and optional paths, in deps-accept.yaml. Trivy is the release binary, pinned by version and
+# SHA-256 below; its vulnerability database and checks bundle are cached between runs. Linux x64 runners only.
+name: Aedis SCA
+description: >-
+  Trivy filesystem scan of the repository (dependency vulnerabilities, secrets and misconfigurations) with one JSON
+  summary, a Markdown report, SARIF in code scanning and a gate: findings at the configured severity fail the job
+  unless accepted, with an expiry date and optional paths, in deps-accept.yaml.
+author: Aedis
+branding:
+  icon: package
+  color: purple
+inputs:
+  scanners:
+    description: Trivy scanners, comma-separated (vuln, secret, misconfig, license)
+    default: vuln,secret,misconfig
+  severity:
+    description: Severities of the vulnerabilities reported (Trivy names, comma-separated)
+    default: HIGH,CRITICAL
+  config-severity:
+    description: Severities of the secrets and misconfigurations reported (Trivy names, comma-separated)
+    default: HIGH,CRITICAL
+  ignore-unfixed:
+    description: Leave out the vulnerabilities without a fixed version (true or false; vulnerabilities only)
+    default: "true"
+  path:
+    description: Directory to scan, relative to the workspace
+    default: .
+  accept-file:
+    description: Risk acceptance file (list of id or package, until, reason and, optionally, paths)
+    default: deps-accept.yaml
+  fail-on:
+    description: Lowest severity that fails the job, over the unaccepted findings (High, Medium or Low)
+    default: High
+  summary-name:
+    description: Name of the artifact with deps-summary.json, the Markdown report, the Trivy JSON and the SARIF
+    default: deps-summary
+  sarif-upload:
+    description: Upload the SARIF to code scanning as aedis-sca/trivy (true or false); the job needs security-events write
+    default: "true"
+outputs:
+  result:
+    description: pass or fail of the gate
+    value: ${{ steps.summary.outputs.result }}
+runs:
+  using: composite
+  steps:
+    - name: Trivy
+      id: trivy
+      shell: bash
+      env:
+        TRIVY_VERSION: 0.76.1
+        TRIVY_SHA256: c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0
+      run: |
+        set -euo pipefail
+        if [ "$RUNNER_OS" != Linux ] || [ "$RUNNER_ARCH" != X64 ]; then
+          echo "::error::Aedis SCA pins Trivy $TRIVY_VERSION for Linux x64; this runner is $RUNNER_OS $RUNNER_ARCH"; exit 1
+        fi
+        dir="$RUNNER_TEMP/aedis-sca"; mkdir -p "$dir"
+        curl -fsSL --retry 3 -o "$dir/trivy.tar.gz" \
+          "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+        echo "$TRIVY_SHA256  $dir/trivy.tar.gz" | sha256sum -c -
+        tar -xzf "$dir/trivy.tar.gz" -C "$dir" trivy
+        echo "$dir" >> "$GITHUB_PATH"
+        echo "version=$TRIVY_VERSION" >> "$GITHUB_OUTPUT"
+        "$dir/trivy" --version
+    # A fresh entry per run keeps the database and the checks bundle current; the restore key takes the latest one.
+    - name: Trivy database cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/trivy
+        key: aedis-sca-trivy-${{ steps.trivy.outputs.version }}-${{ github.run_id }}
+        restore-keys: aedis-sca-trivy-${{ steps.trivy.outputs.version }}-
+    # One scan at the union of both severity lists; deps-summary.py keeps vulnerabilities at `severity` and secrets and
+    # misconfigurations at `config-severity`. The SARIF is converted from the same JSON, so it carries the union.
+    - name: Scan
+      shell: bash
+      env:
+        SCANNERS: ${{ inputs.scanners }}
+        SEVERITY: ${{ inputs.severity }}
+        CONFIG_SEVERITY: ${{ inputs.config-severity }}
+        IGNORE_UNFIXED: ${{ inputs.ignore-unfixed }}
+        SCAN_PATH: ${{ inputs.path }}
+      run: |
+        set -euo pipefail
+        mkdir -p sca
+        union="$(printf '%s,%s' "$SEVERITY" "$CONFIG_SEVERITY" | tr ',' '\n' | tr '[:lower:]' '[:upper:]' | tr -d ' ' | awk 'NF && !seen[$0]++' | paste -sd,)"
+        args=(--scanners "$SCANNERS" --severity "$union" --format json --output sca/trivy.json)
+        [ "$IGNORE_UNFIXED" != true ] || args+=(--ignore-unfixed)
+        trivy fs --quiet "${args[@]}" "$SCAN_PATH"
+        trivy convert --quiet --format sarif --output sca/trivy.sarif sca/trivy.json
+    - name: SARIF to code scanning
+      if: inputs.sarif-upload == 'true'
+      uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      continue-on-error: true
+      with:
+        sarif_file: sca/trivy.sarif
+        category: aedis-sca/trivy
+    - name: Summary and gate
+      id: summary
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        ACCEPT: ${{ inputs.accept-file }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        SEVERITY: ${{ inputs.severity }}
+        CONFIG_SEVERITY: ${{ inputs.config-severity }}
+      run: |
+        set -euo pipefail
+        rc=0
+        python3 "$ACTION_PATH/deps-summary.py" --input sca/trivy.json --accept "$ACCEPT" --fail-on "$FAIL_ON" \
+          --vuln-severity "$SEVERITY" --config-severity "$CONFIG_SEVERITY" --out sca/deps-summary.json --markdown sca/report.md || rc=$?
+        cat sca/report.md >> "$GITHUB_STEP_SUMMARY"
+        echo "result=$([ $rc -eq 0 ] && echo pass || echo fail)" >> "$GITHUB_OUTPUT"
+        exit $rc
+    - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      if: always()
+      with:
+        name: ${{ inputs.summary-name }}
+        path: |
+          sca/deps-summary.json
+          sca/report.md
+          sca/trivy.json
+          sca/trivy.sarif
+        if-no-files-found: ignore

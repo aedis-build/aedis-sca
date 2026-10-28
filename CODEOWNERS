@@ -1,0 +1,8 @@
+# Owners by path. The action's entry point, the summary, CI, this file and the security policy require review from platform security.
+*                               @aedis-build/maintainers
+/action.yml                     @aedis-build/platform-security
+/deps-summary.py                @aedis-build/platform-security
+/test/                          @aedis-build/platform-security
+/.github/                       @aedis-build/platform-security
+/CODEOWNERS                     @aedis-build/platform-security
+/SECURITY.md                    @aedis-build/platform-security
