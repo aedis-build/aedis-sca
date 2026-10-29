@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   cut:
-    uses: aedis-build/aedis-platform/.github/workflows/release-cut.yml@87835c71df53fae48e13a535f6b04de95bca5955 # v1.2.2
+    uses: aedis-build/aedis-platform/.github/workflows/release-cut.yml@af2f2aca355c38bac8e2d6da12e756f9d81033ae # v1.3.3
     permissions:
       contents: read
     with:
@@ -40,7 +40,7 @@ jobs:
   publish:
     needs: cut
     if: needs.cut.outputs.tag != ''
-    uses: aedis-build/aedis-platform/.github/workflows/release-tag.yml@87835c71df53fae48e13a535f6b04de95bca5955 # v1.2.2
+    uses: aedis-build/aedis-platform/.github/workflows/release-tag.yml@af2f2aca355c38bac8e2d6da12e756f9d81033ae # v1.3.3
     permissions:
       contents: read
     with:
